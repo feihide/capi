@@ -1,0 +1,445 @@
+<?php
+
+//error_reporting(E_ALL);
+ini_set('date.timezone','Asia/Shanghai');
+
+// Use Loader() to autoload our model
+$loader = new \Phalcon\Loader();
+define('HOST','http://www.zendao.com');
+$loader->registerDirs(array(
+    __DIR__ . '/app/models/',
+    __DIR__ . '/app/lib/'
+))->register();
+ini_set('date.timezone','Asia/Shanghai');
+$di = new \Phalcon\DI\FactoryDefault();
+
+//Set up the database service
+$di->set('db', function(){
+    return new \Phalcon\Db\Adapter\Pdo\Mysql(array(
+        "host" => "192.168.1.200",
+        "username" => "cailangdb",
+        "password" => "redhat",
+        "dbname" => "zentao",
+          'charset' => 'UTF8',
+    ));
+});
+
+$app = new Phalcon\Mvc\Micro($di);
+$app['db'] =  function(){
+    return new \Phalcon\Db\Adapter\Pdo\Mysql(array(
+        "host" => "192.168.1.200",
+        "username" => "cailangdb",
+        "password" => "redhat",
+        'charset' => 'UTF8',
+        "dbname" => "zentao"
+    ));
+};
+
+$app['view'] = function() {
+    $view = new \Phalcon\Mvc\View\Simple();
+    $view->setViewsDir( __DIR__ . '/app/views/');
+    return $view;
+};
+
+
+function getTaskUrl($id){
+    return 'http://192.168.1.200:8080/www/index.php?m=task&f=view&task='.$id;
+}
+
+function getBugUrl($id){
+    return 'http://192.168.1.200:8080/www/index.php?m=bug&f=view&bugID='.$id;
+}
+
+
+function getLink($id,$title){
+    return '<a target="_blank" href="'.getTaskUrl($id).'">'.$title.'</a>';
+}
+
+function getBugLink($id,$title){
+    return '<a target="_blank" href="'.getBugUrl($id).'">'.$title.'</a>';
+}
+
+
+$app->get('/userlist', function () use ($app) {
+    $news = $app['db']->fetchAll('SELECT distinct (u.id) ,u.realname,u.account FROM user u left join userGroup g  on u.account = g.account where g.group in (1,2,4) and u.deleted="0"');
+
+    $year = date("Y");
+    $month = date("m");
+    $day = date('w');
+    $nowMonthDay = date("t");
+
+    $firstday = date('d') - $day;
+    if(substr($firstday,0,1) == "-"){
+        $firstMonth = $month - 1;
+        $lastMonthDay = date("t",$firstMonth);
+        $firstday = $lastMonthDay - substr($firstday,1);
+        $weekTime1 = $year."-".$firstMonth."-".$firstday;
+    }else{
+        $weekTime1 = $year."-".$month."-".$firstday;
+    }
+
+    $lastday = date('d') + (7 - $day);
+    if($lastday > $nowMonthDay){
+        $lastday = $lastday - $nowMonthDay;
+        $lastMonth = $month + 1;
+        $weekTime2 = $year."-".$lastMonth."-".$lastday;
+    }else{
+        $weekTime2 = $year."-".$month."-".$lastday;
+    }
+    $weekTime1 = strtotime($weekTime1);
+
+    $monthTime1 = strtotime(date('Y-m-01', time()));
+    $monthTime2 = date('Y-m-01', strtotime('+1 month'));
+
+    $devList ='';
+    $devInfo=array();
+    $man=array();
+    foreach($news as $item){
+        $devList .= ( $devList?',':'').'"'.$item['account'].'"';
+        $man[$item['realname']] = $item['account'];
+        $devInfo[$item['account']] = array('time_out'=>0, 'doing'=>0,'wait'=>0,'week_assign'=>0,'month_assign'=>0, 'week_finish'=>0,'month_finish'=>0,
+            'week_est_hour'=>0,'month_est_hour'=>0,'week_consumed_hour'=>0,'month_consumed_hour'=>0,'active_bug'=>0,'week_resolved'=>0,
+            'month_resolved'=>0,'today_finish'=>0 );
+    }
+
+    //$devList = '"zhangyifei"';
+
+    //只获取该用户近2月内数据
+    $assignedDate = ' assignedDate between "'.date('Y-m-01', strtotime('-1 month')). '" and "'.date('Y-m-01', strtotime('+1 month')).'"';
+    $where = 'select * from task where deleted="0" and  ( (assignedTo in ('.$devList.') and status in ("wait","doing") )  or ( finishedBy in ('.$devList.') and status in ("done","closed") )  )  and '.$assignedDate;
+    $tasks = $app['db']->fetchAll($where);
+    //print_r($tasks);
+
+
+
+    //按人聚合
+    foreach($tasks as $task){
+         $name = '';
+         switch($task['status']){
+             case 'wait':
+             $name = $task['assignedTo'];
+             $devInfo[$task['assignedTo']]['wait']++;
+             $devInfo[$task['assignedTo']]['wait_list'] .= '['.$task['id'].']指派日【'.date('m-d',strtotime($task['assignedDate'])).'】'.$task['name'].'\n';
+             $devInfo[$task['assignedTo']]['wait_link_list'] .=getLink($task['id'],'['.$task['id'].']指派日【'.date('m-d',strtotime($task['assignedDate'])).'】'.$task['name']).'\n';
+             break;
+             case 'doing':
+                 $name = $task['assignedTo'];
+                 $devInfo[$task['assignedTo']]['doing']++;
+                 $devInfo[$task['assignedTo']]['doing_list'] .= '['.$task['id'].']指派日【'.date('m-d',strtotime($task['assignedDate'])).'】'.$task['name'].'\n';
+                 $devInfo[$task['assignedTo']]['doing_link_list'] .= getLink($task['id'],'['.$task['id'].']指派日【'.date('m-d',strtotime($task['assignedDate'])).'】'.$task['name']).'\n';
+
+                 break;
+             case 'done':
+             case 'closed':
+                $name = $task['finishedBy'];
+                 if(strtotime($task['finishedDate'])>$weekTime1) {
+                     $devInfo[$task['finishedBy']]['week_finish']++;
+                     $devInfo[$task['finishedBy']]['week_finish_list'] .='['.$task['id'].']完成日【'.date('m-d',strtotime($task['finishedDate'])).'】'.$task['name'].'\n';
+                 }
+
+                 if(strtotime($task['finishedDate'])>$monthTime1) {
+                     $devInfo[$task['finishedBy']]['month_finish']++;
+                     $devInfo[$task['finishedBy']]['month_finish_list'] .='['.$task['id'].']完成日【'.date('m-d',strtotime($task['finishedDate'])).'】'.$task['name'].'\n';
+                 }
+
+                 //今日完成任务
+                 if(strtotime($task['finishedDate'])>strtotime(date('Y-m-d', time()))) {
+                     $devInfo[$task['finishedBy']]['today_finish']++;
+                     $devInfo[$task['finishedBy']]['today_finish_list'] .='['.$task['id'].']'.$task['name'].'\n';
+                 }
+             break;
+         }
+
+        //超时任务
+        if( time()-strtotime($task['deadline'])>24*3600  && $task['finishedBy']=='' ) {
+            $devInfo[$name]['time_out']++;
+            $devInfo[$name]['time_out_list'] .='['.$task['id'].']截止日【'.date('m-d',strtotime($task['deadline'])).'】'.$task['name'].'\n';
+
+        }
+
+        //按预期结束时间算
+        if($task['finishedDate']){
+            $fData = $task['finishedDate'];
+        }
+        else{
+            $fData = $task['deadline'];
+        }
+        if(strtotime($fData) > $weekTime1) {
+            $devInfo[$name]['week_assign']++;
+            $devInfo[$name]['week_assign_list'] .='['.$task['id'].']指派日【'.date('m-d',strtotime($task['openedDate'])).'】'.$task['name'].'\n';
+            $devInfo[$name]['week_est_hour']+= $task['estimate'];
+            $devInfo[$name]['week_est_hour_list'] .='['.$task['id'].']预估工时【'.$task['estimate'].'】'.$task['name'].'\n';
+            $devInfo[$name]['week_consumed_hour']+= $task['consumed'];
+            $devInfo[$name]['week_consumed_hour_list'] .='['.$task['id'].']消耗工时【'.$task['consumed'].'】'.$task['name'].'\n';
+        }
+        if(strtotime($fData)>$monthTime1) {
+
+            $devInfo[$name]['month_assign']++;
+            $devInfo[$name]['month_assign_list'] .='['.$task['id'].']指派日【'.date('m-d',strtotime($task['openedDate'])).'】'.$task['name'].'\n';
+
+            $devInfo[$name]['month_est_hour']+= $task['estimate'];
+            $devInfo[$name]['month_est_hour_list'] .='['.$task['id'].']预估工时【'.$task['estimate'].'】'.$task['name'].'\n';
+
+            $devInfo[$name]['month_consumed_hour']+= $task['consumed'];
+            $devInfo[$name]['month_consumed_hour_list'] .='['.$task['id'].']消耗工时【'.$task['consumed'].'】'.$task['name'].'\n';
+
+        }
+    }
+
+    //bug管理
+    $assignedDate = ' assignedDate between "'.date('Y-m-01', strtotime('-1 month')). '" and "'.date('Y-m-01', strtotime('+1 month')).'"';
+    $where = 'select * from bug where deleted="0" and  '.$assignedDate;
+    $bugs = $app['db']->fetchAll($where);
+
+    foreach($bugs as $bug){
+        if($bug['status']=='active'){
+            $devInfo[$bug['assignedTo']]['active_bug']++;
+            $devInfo[$bug['assignedTo']]['active_bug_list'] .='['.$bug['id'].']提出时间【'.$bug['assignedDate'].'】'.$bug['title'].'\n';
+            $devInfo[$bug['assignedTo']]['active_bug_link_list'] .=getBugLink($bug['id'],'['.$bug['id'].']提出时间【'.$bug['assignedDate'].'】'.$bug['title']).'\n';
+        }
+        if(in_array($bug['status'],array('resolved','closed'))){
+            if(strtotime($bug['resolvedDate'])> $weekTime1){
+                $devInfo[$bug['resolvedBy']]['week_resolved']++;
+                $devInfo[$bug['resolvedBy']]['week_resolved_list'] .='['.$bug['id'].']解决时间【'.$bug['resolvedDate'].'】'.$bug['title'].'\n';
+            }
+
+            if(strtotime($bug['resolvedDate'])> $monthTime1){
+                $devInfo[$bug['resolvedBy']]['month_resolved']++;
+                $devInfo[$bug['resolvedBy']]['month_resolved_list'] .='['.$bug['id'].']解决时间【'.$bug['resolvedDate'].'】'.$bug['title'].'\n';
+            }
+
+            if(strtotime($bug['resolvedDate'])> strtotime(date('Y-m-d', time()))){
+                $devInfo[$bug['resolvedBy']]['today_resolved']++;
+                $devInfo[$bug['resolvedBy']]['today_resolved_list'] .='['.$bug['id'].']'.$bug['title'].'\n';
+            }
+
+        }
+
+    }
+
+    //当日日报
+    $assignedDate = ' date ="'.date('Y-m-d', time()) .'"';
+    $where = 'select * from `todo` where type="daily" and  '.$assignedDate;
+    $todo = $app['db']->fetchAll($where);
+    foreach($todo as $item){
+        $todo[$item['account']] = $item;
+    }
+    reset($news);
+
+    // Render app/views/products/show.phtml passing some variables
+    echo $app['view']->render('userlist', array(
+        'news'=>$news,
+        'detail'=>$devInfo,
+        'todo'=>$todo,
+        'man'=>$man
+    ));
+});
+
+
+//提醒API
+
+$app->get('/user_attention_list',function() use ($app) {
+    $news = $app['db']->fetchAll('SELECT distinct (u.id) ,u.realname,u.account,u.email FROM user u left join userGroup g  on u.account = g.account where g.group in (1,2,4) and u.deleted="0"');
+
+    $devList ='';
+    $dev = array();
+    $attentionList =array();
+    foreach($news as $item){
+        if($item['account']!='sunlei'){
+            $devList .= ( $devList?',':'').'"'.$item['account'].'"';
+            $attentionList[$item['account']]=array('email'=>$item['email']);
+        }
+    }
+
+    //$devList = '"zhangyifei"';
+
+    //只获取该用户近2月内数据
+    $where = 'select * from task where deleted="0" and ( (assignedTo in ('.$devList.') and status in ("wait","doing") ))';
+    $tasks = $app['db']->fetchAll($where);
+    //print_r($tasks);
+
+    //按人聚合
+    foreach($tasks as $task){
+
+        //超时任务
+        if(strtotime($task['deadline']) <(time()-24*3600) && $task['finishedBy']=='' ) {
+            //任务者提醒
+            $attentionList[ $task['assignedTo']]['time_out_list'][]= getLink($task['id'] ,'截止日【'.date('m-d',strtotime($task['deadline'])).'】'.$task['name']);
+            if( $task['assignedTo'] !=  $task['openedBy']){
+            //发任务者提醒
+                $attentionList[$task['openedBy']]['assign_time_out_list'][]=getLink($task['id'],'截止日【'.date('m-d',strtotime($task['deadline'])).'】'.$task['name']);
+            }
+        }
+        elseif( (time() - strtotime($task['deadline'])<3600*24) && (time() - strtotime($task['deadline'])>0) ) {
+            //即将到期
+            $attentionList[ $task['assignedTo']]['will_time_out_list'][]=getLink($task['id'],'截止日【'.date('m-d',strtotime($task['deadline'])).'】'.$task['name']);
+
+        }
+
+        if($task['status'] == 'doing'){
+            $attentionList[$task['assignedTo']]['doing_list'][]=getLink($task['id'],'指派日【'.date('m-d',strtotime($task['assignedDate'])).'】'.$task['name']);
+        }
+    }
+
+    //bug管理
+    $where = 'select * from bug where  deleted="0" and status ="active"';
+    $bugs = $app['db']->fetchAll($where);
+
+    foreach($bugs as $bug){
+            $attentionList[$bug['assignedTo']]['active_bug_list'][]=getBugLink($bug['id'],'提出时间【'.$bug['assignedDate'].'】'.$bug['title']);
+    }
+    //print_r($attentionList);exit;
+    echo json_encode($attentionList);
+    exit;
+});
+
+$app->get('/user/{id}',function($id) use ($app) {
+        $name = '';
+        $ids = explode(',',$id);
+        $data = array();
+        if(!empty($ids)){
+            foreach($ids as $id){
+
+        $item = $app['db']->fetchOne('SELECT *  FROM user where id = '.$id);
+        $name .= $item['realname'].' ';
+        //只获取该用户近2个月数据
+        $assignedDate = ' assignedDate between "'.date('Y-m-01', strtotime('-1 month')). '" and "'.date('Y-m-01', strtotime('+1 month')).'"';
+        $where = 'select * from task where ( (assignedTo ="'.$item['account'].'" and status in ("wait","doing") )  or ( finishedBy="'.$item['account'].'" and status in ("done","closed") )  )  and '.$assignedDate;
+        $tasks = $app['db']->fetchAll($where);
+
+        foreach($tasks as $task){
+
+            $start = $task['realStarted'];
+            if($start == '0000-00-00' ){
+                $start= $task['estStarted'];
+                if($start == '0000-00-00' )
+                    continue;
+            }
+
+
+            //当没设置截止时间，默认开始时间+35小时
+            $deadline = $task['finishedDate'];
+            if(strpos($deadline,'0000-00-00')!==false ){
+                $deadline = $task['deadline'];
+                if(strpos($deadline,'0000-00-00')!==false ){
+                    $deadline = date('Y-m-d',strtotime($start)+3600*35);
+                }
+            }
+
+
+            switch($task['pri']){
+                case 1:
+                    $class = '';
+                break;
+                case 2:
+                    $class = 'important';
+                    break;
+                default:
+                    $class = '';
+            }
+
+
+            $v = array('label' => $task['name'].'['.$task['status'].']',
+              'start' => $start,
+              'end'   => $deadline,
+              'class' => $class
+            );
+            $data[] = $v;
+        }
+            }
+        }
+        else{
+            return '数据有误';
+        }
+
+        $gantti = new Gantti($data, array(
+            'title'      => '进度报表',
+            'cellwidth'  => 60,
+            'cellheight' => 30,
+            'today'      => true
+        ));
+        echo $app['view']->render('user', array(
+            'user'=>$name,
+            'gantti'=>$gantti
+        ));
+
+    }
+);
+
+$app->get('/pic', function () use ($app) {
+    echo base64_encode(file_get_contents('E:\\1.jpg'));
+});
+
+//Return a rendered view
+$app->get('/products/show', function() use ($app) {
+
+    // Render app/views/products/show.phtml passing some variables
+    echo $app['view']->render('products/show', array(
+        'id' => 100,
+        'name' => 'Artichoke'
+    ));
+
+});
+
+
+$app->get('/', function () use($app) {
+
+    return $app->response->redirect('home/index.htm');;
+});
+
+$app->get('/g', function () {
+    phpinfo();exit;
+# Create our client object.
+    $client= new GearmanClient();
+    # Add default server (localhost).
+    $client->addServer('192.168.1.182',4730);
+    echo "Sending job\n";
+    # Send reverse job
+    $result = $client->do("abc", "netstat -nat | grep 80");
+    if ($result)    echo "Success: $result\n";
+});
+
+
+// With a function
+function say_hello($name) {
+    echo "<h1>Hello! $name</h1>";
+}
+
+$app->get('/say/hello/{name}', "say_hello");
+
+// With a static method
+$app->get('/say/hello/{name}', "SomeClass::someSayMethod");
+
+// With a method in an object
+//$myController = new MyController();
+//$app->get('/say/hello/{name}', array($myController, "someAction"));
+
+//Anonymous function
+$app->get('/say/hello/{name}', function ($name) {
+    echo "<h1>Hello! $name</h1>";
+});
+
+function decodeUnicode($str)
+{
+    return preg_replace_callback('/\\\\u([0-9a-f]{4})/i',
+        create_function(
+            '$matches',
+            'return mb_convert_encoding(pack("H*", $matches[1]), "UTF-8", "UCS-2BE");'
+        ),
+        $str);
+}
+
+$app->get('/json',function (){
+    $data = $_GET['data'];
+    print_r(decodeUnicode($data));
+    if(isset($_GET['date'])){
+        echo date('Y-m-d H:i:s',$_GET['date']);
+    }
+});
+
+$app->notFound(function () use ($app) {
+    $app->response->setStatusCode(404, "Not Found")->sendHeaders();
+    echo 'This is crazy, but this page was not found!';
+});
+
+$app->handle();

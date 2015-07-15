@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <title>统计详情</title>
+    <meta charset="utf-8" />
+
+    <link rel="stylesheet" href="/styles/css/screen.css" />
+    <link rel="stylesheet" href="/styles/css/gantti.css" />
+
+</head>
+
+<body>
+<div ><h2><a href="/userlist">返回列表</a></h2><h3>包含人员名单:<?php echo $user;?></h3></div>
+<?php
+
+echo $gantti ?>
+
+</body>
+
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            * { margin:0;padding:0;font-size:13px;}
+            table.userlist {   width:99%;height:100%;text-align:center;margin:5px;}
+            .userlist caption { font-size:20px;text-align:left;}
+            h1 {font-size:26px;}
+            .userlist th { background:#f9f9f9;}
+            .userlist tr:hover{background-color: #f0f0f0;}
+            .userlist td { cursor:pointer;}
+            .userlist .hover { background:#ff6a00!important;}
+            .report td { text-align:left;}
+            .report td:first-child { text-align:center;width:4%;}
+            .userlist .hover { background: #ff6a00!important; }
+            table.report {width:1600px;}
+        </style>
+    </head>
+    <body>
+
+    <button onclick="location.reload()">实时刷新</button><h2>数据生成时间<?php echo date('Y-m-d H:i:s',time());?></h2>
+    <h2><a target="_blank" href="http://192.168.1.200:8080/www/index.php?m=todo&f=create">====天天向上，写好日报====</a></h2>
+    <?php
+    $group = array('PHP组'=>array('张翼飞','徐志才','倪迪飞','朱晓明','李峰',)
+        ,'前端'=>array('邹文杰','徐惠芳','芮正云','王驹'),
+        '运维'=>array('董亚辉'));
+    echo '<center><h1>技术部禅道系统数据统计表</h1></center>';
+    echo '<table class="userlist" border="1" cellspacing="0" cellpadding="0" ><tr><th>姓名</th><th><button onclick="jump()">进入多选报表</button></th><th>超时任务数</th><th>进行任务数</th><th>等待任务数</th>
+    <th>本周指派任务数</th><th>本周完成任务数</th><th>本周预计工时</th><th>本周实际消耗工时</th>
+    <th>本月指派任务数</th><th>本月完成任务数</th><th>本月预计工时</th><th>本月实际消耗工时</th>
+    <th>待处理bug</th><th>本周解决BUG数</th><th>本月解决BUG数</th></tr>';
+     $arr = array();
+     $list = array();
+
+        foreach ($news as $new) {
+            $info = $detail[$new['account']];
+            // print_r($new);
+            $str = '';
+            $tmpList= '';
+
+            $tmpList.= $str .= '<tr><td width="4%"><a href="'.HOST.'/user/'.$new['id'].'">'.$new['realname'].'</a></td>';
+
+            $str .= '<td><input type="checkbox" name="ids[]" value="'.$new['id'].'" id="ids"></td>';
+            $style ='';
+            if($info['time_out']){
+                $style="style ='background-color:#FF6347'";
+            }
+            $str .= '<td  '.$style.' onclick = \'alert("'.$info['time_out_list'].'")\'>'.$info['time_out'].'</td>';
+
+
+            $style ='';
+            if($info['doing']){
+                $style="style ='background-color:#00FF00'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['doing_list'].'")\'>'.$info['doing'].'</td>';
+
+
+            $style ='';
+            if($info['wait']){
+                $style="style ='background-color:#FF9912'";
+            }
+            $str .= '<td  '.$style.' onclick = \'alert("'.$info['wait_list'].'")\'>'.$info['wait'].'</td>';
+
+
+
+            $style ='';
+            if($info['week_assign']){
+                $style="style ='background-color:#FFFFCD'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['week_assign_list'].'")\'>'.$info['week_assign'].'</td>';
+            $style ='';
+            if($info['week_finish']){
+                $style="style ='background-color:#FFFF00'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['week_finish_list'].'")\'> '.$info['week_finish'].'</td>';
+            $style ='';
+            if($info['week_est_hour']){
+                $style="style ='background-color:#FCE6C9'";
+            }
+
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['week_est_hour_list'].'")\'>'.$info['week_est_hour'].'</td>';
+            $style ='';
+
+            if($info['week_consumed_hour']){
+                $style="style ='background-color:#FFFAF0'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['week_consumed_hour_list'].'")\'>'.$info['week_consumed_hour'].'</td>';
+            $style ='';
+            if($info['month_assign']){
+                $style="style ='background-color:#FFFFCD'";
+            }
+
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['month_assign_list'].'")\'>'.$info['month_assign'].'</td>';
+            $style ='';
+            if($info['month_finish']){
+                $style="style ='background-color:#FFFF00'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['month_finish_list'].'")\'>'.$info['month_finish'].'</td>';
+            $style ='';
+            if($info['month_est_hour']){
+                $style="style ='background-color:#FCE6C9'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['month_est_hour_list'].'")\'>'.$info['month_est_hour'].'</td>';
+            $style ='';
+            if($info['month_consumed_hour']){
+                $style="style ='background-color:#FFFAF0'";
+            }
+            $str .= '<td  '.$style.' onclick = \'alert("'.$info['month_consumed_hour_list'].'")\'>'.$info['month_consumed_hour'].'</td>';
+            $style ='';
+            if($info['active_bug']){
+                $style="style ='background-color:#FF6347'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['active_bug_list'].'")\'>'.$info['active_bug'].'</td>';
+
+            $style ='';
+            if($info['week_resolved']){
+                $style="style ='background-color:#B0E0E6'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['week_resolved_list'].'")\'>'.$info['week_resolved'].'</td>';
+            $style ='';
+            if($info['month_resolved']){
+                $style="style ='background-color:#87CEEB'";
+            }
+            $str .= '<td  '.$style.'  onclick = \'alert("'.$info['month_resolved_list'].'")\'>'.$info['month_resolved'].'</td>';
+            $str .=  '</tr>';
+            $arr[$new['realname']]=$str;
+
+            //$tmpList = '<tr><td><a href="/user/'.$new['id'].'">'.$new['realname'].'</a></td>';
+            $tmpList .='<td >'.$info['doing_link_list'].'</td>';
+            $tmpList .='<td >'.$info['today_finish_list'].'</td>';
+            $tmpList .= '<td>'.$info['today_resolved_list'].'</td>';
+            $tmpList .='<td >'.$info['wait_link_list'].'</td>';
+            $tmpList .='<td>'.$info['active_bug_link_list'].'</td></tr>';
+
+            $list[$new['realname']]=$tmpList;
+        }
+
+
+       foreach($group as $key =>$item){
+            echo  '<tr><td colspan="16"><h3>'.$key.'</h3></td></tr>';
+           foreach($item as $name){
+               echo $arr[$name];
+           }
+       }
+
+    echo '</table>';
+
+    reset($group);
+
+    echo '<center><h1>'.date('Y-m-d ',time()).'日报</h1></center>';
+    echo '<table class="userlist report"  border="1" cellspacing="0" cellpadding="0"><tr><th width="5%">姓名</th><th width="80%">内容</th></tr>';
+    foreach($group as $key =>$item){
+        echo  '<tr><td  colspan="3"><h3>'.$key.'</h3></td></tr>';
+        foreach($item as $name){
+            echo  '<tr><td ><h3>'.$name.'</h3></td><td>';
+            echo  !empty($todo[$man[$name]]['desc'])?$todo[$man[$name]]['desc']:'暂无';
+            echo '</td></tr>';
+            //  echo join("<br/>\n",explode('\n',$list[$name]));
+        }
+    }
+    echo '</table>';
+
+    reset($group);
+    echo '<center><h1>今日动态报表</h1></center>';
+    echo '<table class="userlist report"  border="1" cellspacing="0" cellpadding="0"><tr><th width="4%">姓名</th><th width="19%">进行中任务</th>
+    <th width="19%">今日完成任务</th><th width="19%">今日修复BUG</th><th width="19%">待处理任务</th><th>待处理BUG</th></tr>';
+
+    foreach($group as $key =>$item){
+        echo  '<tr><td  colspan="16"><h3>'.$key.'</h3></td></tr>';
+        foreach($item as $name){
+            echo join("<br/>\n",explode('\n',$list[$name]));
+        }
+    }
+    echo '</table>';
+    ?>
+<script>
+    function jump(){
+        var str = '';
+        var r=document.getElementsByName("ids[]");
+        for(var i=0;i<r.length;i++){
+            if(r[i].checked){
+                if(str)
+                    str =str+',';
+                str =str + r[i].value;
+            }
+        }
+        location.href='/user/'+str;
+    }
+
+</script>
+
+     </body>
+    </html>
